@@ -8,5 +8,5 @@
   "integration_type": "device",
   "iot_class": "cloud_polling",
   "requirements": ["beautifulsoup4>=4.12.0", "requests>=2.25.0"],
-  "version": "14.11.2025"
+  "version": "1.0.0"
 }
