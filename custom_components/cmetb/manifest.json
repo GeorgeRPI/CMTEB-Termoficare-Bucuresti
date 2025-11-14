@@ -4,7 +4,7 @@
   "codeowners": ["@GeorgeRPI"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/GeorgeRPI/cmteb_termoficare",
+  "documentation": "https://github.com/GeorgeRPI/cmteb",
   "integration_type": "device",
   "iot_class": "cloud_polling",
   "requirements": ["beautifulsoup4>=4.12.0", "requests>=2.25.0"],
