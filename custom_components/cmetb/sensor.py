@@ -2,54 +2,73 @@ import requests
 from bs4 import BeautifulSoup
 import logging
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import CONF_NAME
+from .const import DOMAIN, CONF_SECTOR, CONF_NUME_PUNCT
 
 _LOGGER = logging.getLogger(__name__)
 
 class CmtebSensor(SensorEntity):
     """Representation of a CMTEB sensor."""
 
-    def __init__(self, name, punct_termic):
-        self._name = name
-        self._punct_termic = punct_termic
+    def __init__(self, hass, config):
+        self._hass = hass
+        self._sector = config[CONF_SECTOR]
+        self._nume_punct = config[CONF_NUME_PUNCT]
         self._state = None
         self._attributes = {}
+        
+        # Nume unic pentru sensor
+        self._name = f"Termoficare {self._sector} - {self._nume_punct}"
 
-    def update(self):
+    async def async_update(self):
         """Update sensor data."""
         try:
-            url = "https://www.cmteb.ro/harta_stare_sistem_termoficare_bucuresti.php"
-            response = requests.get(url, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            # Folosește executor thread pentru requests sincrone
+            date = await self._hass.async_add_executor_job(
+                self._extrage_date_cmteb
+            )
             
-            # Aici trebuie implementată logica de parsare specifică
-            # pentru structura HTML a paginii CMTEB
-            
-            date = self._extrage_date_punct(self._punct_termic, soup)
-            
-            self._state = date.get('stare')
+            self._state = date.get('stare', 'Necunoscut')
             self._attributes = {
-                'nume_punct': date.get('nume'),
-                'afectat': date.get('afectat'),
-                'termen_finalizare': date.get('termen'),
-                'culoare': date.get('culoare')
+                'sector': self._sector.replace('_', ' ').title(),
+                'nume_punct': self._nume_punct,
+                'afectat': date.get('afectat', 'Necunoscut'),
+                'termen_finalizare': date.get('termen', 'Necunoscut'),
+                'culoare': date.get('culoare', '#CCCCCC'),
+                'ultima_actualizare': date.get('actualizare')
             }
             
         except Exception as e:
-            _LOGGER.error("Eroare la extragerea datelor: %s", e)
+            _LOGGER.error("Eroare la extragerea datelor pentru %s: %s", self._name, e)
+            self._state = "Eroare"
+            self._attributes = {'eroare': str(e)}
 
-    def _extrage_date_punct(self, punct_termic, soup):
-        """Extrage datele pentru un punct termic specific."""
-        # IMPLEMENTARE: Parsarea HTML pentru punctul termic
-        # Aceasta va trebui adaptată la structura reală a paginii
+    def _extrage_date_cmteb(self):
+        """Extrage datele de pe site-ul CMTEB."""
+        url = "https://www.cmteb.ro/harta_stare_sistem_termoficare_bucuresti.php"
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.content, 'html.parser')
         
-        return {
-            'nume': punct_termic,
+        # AICI implementezi logica reală de parsare
+        # Folosește self._sector și self._nume_punct pentru a găsi datele corecte
+        
+        return self._cauta_date_dupa_sector_nume(soup, self._sector, self._nume_punct)
+
+    def _cauta_date_dupa_sector_nume(self, soup, sector, nume_punct):
+        """Caută datele pentru sector și nume punct specific."""
+        # IMPLEMENTARE REALĂ: 
+        # Această funcție trebuie să parseze HTML-ul și să găsească
+        # datele pentru combinatia sector + nume_punct
+        
+        # Exemplu temporar:
+        date_exemplu = {
             'stare': 'Functionare normala',
             'afectat': 'Nimic',
             'termen': None,
-            'culoare': 'verde'
+            'culoare': '#00FF00',
+            'actualizare': '2024-01-01 12:00:00'
         }
+        
+        return date_exemplu
 
     @property
     def name(self):
@@ -62,3 +81,15 @@ class CmtebSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         return self._attributes
+
+    @property
+    def icon(self):
+        """Iconiță în funcție de stare."""
+        if self._state == "Functionare normala":
+            return "mdi:check-circle"
+        elif "Deficienta" in str(self._state):
+            return "mdi:alert-circle"
+        elif "Oprire" in str(self._state):
+            return "mdi:close-circle"
+        else:
+            return "mdi:thermometer"
