@@ -1,47 +1,64 @@
-"""Sensor platform for CMTEB integration."""
+import requests
+from bs4 import BeautifulSoup
 import logging
 from homeassistant.components.sensor import SensorEntity
-from .const import DOMAIN, CONF_SECTOR, CONF_NUME_PUNCT
+from homeassistant.const import CONF_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up the sensor platform."""
-    data = config_entry.data
-    sensor = CmtebSensor(data)
-    async_add_entities([sensor])
-
 class CmtebSensor(SensorEntity):
-    """Representation of a CMTEB Sensor."""
+    """Representation of a CMTEB sensor."""
 
-    def __init__(self, config):
-        """Initialize the sensor."""
-        self._config = config
+    def __init__(self, name, punct_termic):
+        self._name = name
+        self._punct_termic = punct_termic
         self._state = None
         self._attributes = {}
 
+    def update(self):
+        """Update sensor data."""
+        try:
+            url = "https://www.cmteb.ro/harta_stare_sistem_termoficare_bucuresti.php"
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Aici trebuie implementată logica de parsare specifică
+            # pentru structura HTML a paginii CMTEB
+            
+            date = self._extrage_date_punct(self._punct_termic, soup)
+            
+            self._state = date.get('stare')
+            self._attributes = {
+                'nume_punct': date.get('nume'),
+                'afectat': date.get('afectat'),
+                'termen_finalizare': date.get('termen'),
+                'culoare': date.get('culoare')
+            }
+            
+        except Exception as e:
+            _LOGGER.error("Eroare la extragerea datelor: %s", e)
+
+    def _extrage_date_punct(self, punct_termic, soup):
+        """Extrage datele pentru un punct termic specific."""
+        # IMPLEMENTARE: Parsarea HTML pentru punctul termic
+        # Aceasta va trebui adaptată la structura reală a paginii
+        
+        return {
+            'nume': punct_termic,
+            'stare': 'Functionare normala',
+            'afectat': 'Nimic',
+            'termen': None,
+            'culoare': 'verde'
+        }
+
     @property
     def name(self):
-        """Return the name of the sensor."""
-        return f"Termoficare {self._config[CONF_SECTOR]} - {self._config[CONF_NUME_PUNCT]}"
+        return self._name
 
     @property
     def state(self):
-        """Return the state of the sensor."""
-        return self._state if self._state else "Necunoscut"
+        return self._state
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes."""
         return self._attributes
-
-    def update(self):
-        """Fetch new state data for the sensor."""
-        # Date de test pentru moment
-        self._state = "Functionare normala"
-        self._attributes = {
-            "sector": self._config[CONF_SECTOR],
-            "nume_punct": self._config[CONF_NUME_PUNCT],
-            "afectat": "Nimic",
-            "culoare": "verde"
-        }
